@@ -1,5 +1,6 @@
 import os
 import sys
+import tqdm
 import json
 import copy
 import random
@@ -36,6 +37,7 @@ class CheckerBoard(object):
         board = 20
 
         white = 255,255,255
+        orange = 255,100,80
         black = 0,0,0
 
         self.points = {}
@@ -105,6 +107,12 @@ class CheckerBoard(object):
                     continue
                 pygame.draw.circle(self.screen, white, point, self.grid_witdh/2-1, 0)
 
+            if len(self.mouse_down_real) > 0:
+                point = self.mouse_down_real[-1]
+                pygame.draw.circle(self.screen, orange, point, self.grid_witdh/10, 0)
+                point = self.machine_down_real[-1]
+                pygame.draw.circle(self.screen, orange, point, self.grid_witdh/10, 0)
+
             pygame.display.update()
 
             # machine will play fast than what you can image,
@@ -145,12 +153,79 @@ class CheckerBoard(object):
         else:
             return None
 
+    def get_line_count(self, pos, direction, occupied):
+        c = 1
+        npos = pos + direction
+        while tuple(npos.tolist()) in occupied:
+            c += 1
+            npos = npos + direction
+
+        npos = pos - direction
+        while tuple(npos.tolist()) in occupied:
+            c += 1
+            npos = npos - direction
+
+        return c
+
+    def get_greedy_score(self, pos, white_prototypes, black_prototypes):
+        pos = np.array(pos)
+        DIR = np.array([
+            [0,1],
+            [0,-1],
+            [1,0],
+            [-1,0],
+            [-1,1],
+            [1,1],
+            [1,-1],
+            [-1,-1],
+        ])
+        LINE_DIR = np.array([
+            [0,1],
+            [1,0],
+            [-1,1],
+            [1,1],
+        ])
+        score = 0
+        for d in LINE_DIR:
+            s = self.get_line_count(pos, d, white_prototypes)
+            score += s
+
+        # defend black
+        for d in LINE_DIR:
+            s = self.get_line_count(pos, d, black_prototypes)
+            if s >= 4:
+                score += 100
+        return score
+
+    def greedy_agent_step(self):
+        """greedy algorithm.
+        """
+        available_points = set(self.points.keys()) - set(self.mouse_down_real) -\
+                        set(self.machine_down_real)
+        # score for white
+        white_prototypes = set([self.points[k] for k in self.machine_down_real])
+        black_prototypes = set([self.points[k] for k in self.mouse_down_real])
+            
+        max_score = None
+        best_pos = None
+        available_points = list(available_points)
+        random.shuffle(available_points)
+        for pos in available_points:
+            score = self.get_greedy_score(self.points[pos], white_prototypes, black_prototypes)
+            if max_score is None or score > max_score:
+                max_score = score
+                best_pos = pos
+
+        # print('pos: {}, score: {}'.format(pos, max_score))
+        return best_pos
+
+
     def take_one_step(self):
         available_points = set(self.points.keys()) - set(self.mouse_down_real) -\
                         set(self.machine_down_real)
         if len(available_points) != 0:
             # pick one point
-            return random.choice(list(available_points))
+            return self.greedy_agent_step()
         else:
             return None
 
@@ -170,10 +245,19 @@ class CheckerBoard(object):
         for point in points:
             new_points.append(self.points[point])
 
-        connected_domains = connected_domain(new_points)
-        for index, domain in connected_domains.items():
-            if self.find_five_in_a_row(domain):
-                return True
+        LINE_DIR = np.array([
+            [0,1],
+            [1,0],
+            [-1,1],
+            [1,1],
+        ])
+
+        for pos in new_points:
+            for d in LINE_DIR:
+                c = self.get_line_count(pos, d, new_points)
+                if c >= 5:
+                    return True
+        return False
 
     def find_five_in_a_row(self, points):
         # First version
@@ -205,6 +289,7 @@ class CheckerBoard(object):
                 wt = csv.writer(fout)
                 print('output to {}'.format(self.log_path))
                 wt.writerows(history)
+
             myfont = pygame.font.Font(None, 70)
             textImage = myfont.render("Game Over", True, color)
             self.screen.blit(textImage, (self.length/3, self.width/3))
