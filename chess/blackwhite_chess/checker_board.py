@@ -55,6 +55,7 @@ class CheckerBoard(object):
         delay_draw = False
         rtn = 0
         while True:
+            score_map = {}
             for event in pygame.event.get():
                 if event.type == QUIT:
                     sys.exit()
@@ -66,7 +67,9 @@ class CheckerBoard(object):
                         self.history.append(self.points[tuple(pos_real)])
 
                         # when you take one step, machine will take one step too
-                        pos_machine = self.take_one_step()
+                        pos_machine, score_map = self.take_one_step()
+
+
                         delay_draw = True
                         if pos_machine is not None:
                             self.machine_down_real.append(pos_machine)
@@ -112,6 +115,13 @@ class CheckerBoard(object):
                 pygame.draw.circle(self.screen, orange, point, self.grid_witdh/10, 0)
                 point = self.machine_down_real[-1]
                 pygame.draw.circle(self.screen, orange, point, self.grid_witdh/10, 0)
+
+            # draw scores
+            for pos, score in score_map.items():
+                if score > 4:
+                    font = pygame.font.SysFont(None, 15)
+                    img = font.render('{}'.format(score), True, white)
+                    self.screen.blit(img, pos)
 
             pygame.display.update()
 
@@ -200,6 +210,7 @@ class CheckerBoard(object):
     def greedy_agent_step(self):
         """greedy algorithm.
         """
+        score_map = {}
         available_points = set(self.points.keys()) - set(self.mouse_down_real) -\
                         set(self.machine_down_real)
         # score for white
@@ -212,12 +223,13 @@ class CheckerBoard(object):
         random.shuffle(available_points)
         for pos in available_points:
             score = self.get_greedy_score(self.points[pos], white_prototypes, black_prototypes)
+            score_map[pos] = score
             if max_score is None or score > max_score:
                 max_score = score
                 best_pos = pos
 
         # print('pos: {}, score: {}'.format(pos, max_score))
-        return best_pos
+        return best_pos, score_map
 
 
     def take_one_step(self):
@@ -225,7 +237,8 @@ class CheckerBoard(object):
                         set(self.machine_down_real)
         if len(available_points) != 0:
             # pick one point
-            return self.greedy_agent_step()
+            best_pos, score_map = self.greedy_agent_step()
+            return best_pos, score_map
         else:
             return None
 
@@ -258,23 +271,6 @@ class CheckerBoard(object):
                 if c >= 5:
                     return True
         return False
-
-    def find_five_in_a_row(self, points):
-        # First version
-        # return True if there are five points
-        """
-        if len(points) < 5:
-            return False
-        else:
-            return True
-        """
-
-        # Second version
-        # find five point in a row
-        if five_in_a_row(points) is None:
-            return False
-        else:
-            return True
 
 
     def do_if_gameover(self, rtn):
