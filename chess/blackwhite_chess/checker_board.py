@@ -37,6 +37,7 @@ class CheckerBoard(object):
         board = 20
 
         white = 255,255,255
+        red = 255,20,20
         orange = 255,100,80
         black = 0,0,0
 
@@ -54,8 +55,8 @@ class CheckerBoard(object):
         self.machine_down_real = []
         delay_draw = False
         rtn = 0
+        score_map = {}
         while True:
-            score_map = {}
             for event in pygame.event.get():
                 if event.type == QUIT:
                     sys.exit()
@@ -119,8 +120,8 @@ class CheckerBoard(object):
             # draw scores
             for pos, score in score_map.items():
                 if score > 4:
-                    font = pygame.font.SysFont(None, 15)
-                    img = font.render('{}'.format(score), True, white)
+                    font = pygame.font.SysFont(None, 18)
+                    img = font.render('{}'.format(score), True, red)
                     self.screen.blit(img, pos)
 
             pygame.display.update()
